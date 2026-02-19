@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Message } from '../entities/message.entity';
@@ -28,9 +28,10 @@ export class MessagesService {
     return messages.reverse();
   }
 
-  async delete(id: string, _authorId: string) {
+  async delete(id: string, authorId: string) {
     const msg = await this.messageRepo.findOne({ where: { id } });
     if (!msg) throw new NotFoundException('Message not found');
+    if (msg.author_id !== authorId) throw new ForbiddenException('Cannot delete another user\'s message');
     await this.messageRepo.remove(msg);
     return { deleted: true };
   }

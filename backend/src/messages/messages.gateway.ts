@@ -33,8 +33,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('send_message')
-  async handleMessage(@MessageBody() data: { streamId: string; content: string; reply_to?: string; authorId: string }, @ConnectedSocket() client: Socket) {
-    const message = await this.messagesService.create(data.streamId, data.authorId, { content: data.content, reply_to: data.reply_to });
+  async handleMessage(@MessageBody() data: { streamId: string; content: string; reply_to?: string }, @ConnectedSocket() client: Socket) {
+    const authorId: string = (client as any).user?.id;
+    if (!authorId) {
+      client.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+    const message = await this.messagesService.create(data.streamId, authorId, { content: data.content, reply_to: data.reply_to });
     this.server.to(`stream:${data.streamId}`).emit('new_message', message);
     return message;
   }
