@@ -1,0 +1,41 @@
+import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
+import { MessagesService } from './messages.service';
+
+@WebSocketGateway({ cors: { origin: process.env.FRONTEND_URL || 'http://localhost:3000' } })
+export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger(MessagesGateway.name);
+
+  constructor(private messagesService: MessagesService) {}
+
+  handleConnection(client: Socket) {
+    this.logger.log(`Client connected: ${client.id}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @SubscribeMessage('join_stream')
+  handleJoinStream(@MessageBody() data: { streamId: string }, @ConnectedSocket() client: Socket) {
+    client.join(`stream:${data.streamId}`);
+    return { joined: data.streamId };
+  }
+
+  @SubscribeMessage('leave_stream')
+  handleLeaveStream(@MessageBody() data: { streamId: string }, @ConnectedSocket() client: Socket) {
+    client.leave(`stream:${data.streamId}`);
+    return { left: data.streamId };
+  }
+
+  @SubscribeMessage('send_message')
+  async handleMessage(@MessageBody() data: { streamId: string; content: string; reply_to?: string; authorId: string }, @ConnectedSocket() client: Socket) {
+    const message = await this.messagesService.create(data.streamId, data.authorId, { content: data.content, reply_to: data.reply_to });
+    this.server.to(`stream:${data.streamId}`).emit('new_message', message);
+    return message;
+  }
+}
