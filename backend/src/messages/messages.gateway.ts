@@ -1,6 +1,7 @@
 import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
 
 @WebSocketGateway({ cors: { origin: process.env.FRONTEND_URL || 'http://localhost:3000' } })
@@ -10,10 +11,26 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(MessagesGateway.name);
 
-  constructor(private messagesService: MessagesService) {}
+  constructor(
+    private messagesService: MessagesService,
+    private jwtService: JwtService,
+  ) {}
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    try {
+      const token =
+        (client.handshake.auth?.token as string) ||
+        (client.handshake.headers?.authorization as string)?.replace('Bearer ', '');
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+      const payload = this.jwtService.verify<{ sub: string; username: string }>(token);
+      (client as any).user = { id: payload.sub, username: payload.username };
+      this.logger.log(`Client connected: ${client.id} (user: ${payload.username})`);
+    } catch {
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
