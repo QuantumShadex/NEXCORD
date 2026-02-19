@@ -13,6 +13,7 @@ import { Membership } from './entities/membership.entity';
 import { Role } from './entities/role.entity';
 import { Stream } from './entities/stream.entity';
 import { Message } from './entities/message.entity';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -27,7 +28,9 @@ import { Message } from './entities/message.entity';
         password: config.get('DB_PASSWORD', 'nexcord'),
         database: config.get('DB_NAME', 'nexcord'),
         entities: [User, Space, Membership, Role, Stream, Message],
-        synchronize: config.get('NODE_ENV') !== 'production',
+        // synchronize is enabled by default since no migrations exist yet.
+        // Set DB_SYNC=false to disable in production once migrations are in place.
+        synchronize: config.get('DB_SYNC') !== 'false',
       }),
       inject: [ConfigService],
     }),
@@ -38,5 +41,6 @@ import { Message } from './entities/message.entity';
     MessagesModule,
     RolesModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
